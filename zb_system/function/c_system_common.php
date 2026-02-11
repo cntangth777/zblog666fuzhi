@@ -180,15 +180,154 @@ function GetCurrentHost($blogpath, &$cookiesPath)
     return $host . $cookiesPath;
 }
 
-// ... 篇幅原因，此处省略中间未改动的原代码 (SetHttpStatusCode, JsonEncode, SubStrUTF8 等函数) ...
-// 请保持你原有的中间函数内容不变，直到文件最后一行。
+/**
+ * 设置http状态头.
+ *
+ * @param int $number HttpStatus
+ *
+ * @return bool
+ */
+function SetHttpStatusCode($number, $force = false)
+{
+    static $status = '';
+    if ($status != '' && $force == false) {
+        return false;
+    }
+
+    $codes = array(
+        100 => 'Continue', 101 => 'Switching Protocols', 102 => 'Processing',
+        200 => 'OK', 201 => 'Created', 202 => 'Accepted', 203 => 'Non-Authoritative Information', 204 => 'No Content', 205 => 'Reset Content', 206 => 'Partial Content', 207 => 'Multi-Status',
+        300 => 'Multiple Choices', 301 => 'Moved Permanently', 302 => 'Found', 303 => 'See Other', 304 => 'Not Modified', 305 => 'Use Proxy', 307 => 'Temporary Redirect',
+        400 => 'Bad Request', 401 => 'Unauthorized', 402 => 'Payment Required', 403 => 'Forbidden', 404 => 'Not Found', 405 => 'Method Not Allowed', 406 => 'Not Acceptable', 407 => 'Proxy Authentication Required', 408 => 'Request Timeout', 409 => 'Conflict', 410 => 'Gone', 411 => 'Length Required', 412 => 'Precondition Failed', 413 => 'Request Entity Too Large', 414 => 'Request-URI Too Long', 415 => 'Unsupported Media Type', 416 => 'Requested Range Not Satisfiable', 417 => 'Expectation Failed', 422 => 'Unprocessable Entity', 423 => 'Locked', 424 => 'Failed Dependency', 426 => 'Upgrade Required', 428 => 'Precondition Required', 429 => 'Too Many Requests', 431 => 'Request Header Fields Too Large', 451 => 'Unavailable For Legal Reasons',
+        500 => 'Internal Server Error', 501 => 'Not Implemented', 502 => 'Bad Gateway', 503 => 'Service Unavailable', 504 => 'Gateway Timeout', 505 => 'HTTP Version Not Supported'
+    );
+
+    if (isset($codes[$number])) {
+        if (!headers_sent()) {
+            header('HTTP/1.1 ' . $number . ' ' . $codes[$number]);
+            $status = $number;
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * 用script标签进行跳转.
+ */
+function RedirectByScript($url)
+{
+    echo '<script>location.href = decodeURIComponent("' . urlencode($url) . '");</script>';
+    die();
+}
+
+/**
+ * 302跳转.
+ */
+function Redirect302($url)
+{
+    SetHttpStatusCode(302);
+    if (!headers_sent()) {
+        header('Location: ' . $url);
+    }
+}
+
+if (!function_exists('Redirect')) {
+    function Redirect($url)
+    {
+        Redirect302($url);
+        die();
+    }
+}
+
+/**
+ * 301跳转.
+ */
+function Redirect301($url)
+{
+    SetHttpStatusCode(301);
+    if (!headers_sent()) {
+        header('Location: ' . $url);
+    }
+}
+
+/**
+ * Http404
+ */
+function Http404()
+{
+    SetHttpStatusCode(404);
+    if (!headers_sent()) {
+        header("Status: 404 Not Found");
+    }
+}
+
+/**
+ * 获取客户端IP.
+ */
+function GetGuestIP()
+{
+    global $zbp;
+    $user_ip = null;
+    if (isset($_SERVER["HTTP_X_FORWARDED_FOR"])) {
+        $user_ip = $_SERVER["HTTP_X_FORWARDED_FOR"];
+        if (strpos($user_ip, ',') !== false) {
+            $array = explode(",", $user_ip);
+            $user_ip = $array[0];
+        }
+    } elseif (isset($_SERVER["HTTP_X_REAL_IP"])) {
+        $user_ip = $_SERVER["HTTP_X_REAL_IP"];
+    } else {
+        $user_ip = $_SERVER["REMOTE_ADDR"];
+    }
+    return $user_ip;
+}
+
+/**
+ * 获取客户端Agent.
+ */
+function GetGuestAgent()
+{
+    return isset($_SERVER["HTTP_USER_AGENT"]) ? $_SERVER["HTTP_USER_AGENT"] : '';
+}
+
+/**
+ * 获取请求来源URL.
+ */
+function GetRequestUri()
+{
+    if (isset($_SERVER['REQUEST_URI'])) {
+        $url = $_SERVER['REQUEST_URI'];
+    } else {
+        $url = $_SERVER['PHP_SELF'];
+    }
+    return $url;
+}
+
+/**
+ * JSON 编码兼容.
+ */
+function JsonEncode($arr)
+{
+    return json_encode($arr, (JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+}
+
+/**
+ * 格式化字符串.
+ */
+function FormatString($source, $para)
+{
+    if (strpos($para, '[html-format]') !== false) {
+        $source = htmlspecialchars($source);
+    }
+    return $source;
+}
 
 /**
  * ==========================================================
  * 牛哥专用：强制关闭验证码补丁 (针对 HF 环境优化)
  * ==========================================================
  */
-// 这一行会在 Z-Blog 初始化配置时强行覆盖开关
 if (!isset($GLOBALS['option'])) {
     $GLOBALS['option'] = array();
 }
